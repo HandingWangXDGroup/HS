@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from common.rollout import RolloutWorker, CommRolloutWorker
+from common.rollout import RolloutWorker
 from agent.agent import Agents, CommAgents
 from common.replay_buffer import ReplayBuffer
 import matplotlib.pyplot as plt
@@ -10,19 +10,12 @@ class Runner:
     def __init__(self, env, args):
         self.env = env
 
-        if args.alg.find('commnet') > -1 or args.alg.find('g2anet') > -1:  # communication agent
-            self.agents = CommAgents(args)
-            self.rolloutWorker = CommRolloutWorker(env, self.agents, args)
-        else:  # no communication agent
-            self.agents = Agents(args)
-            self.rolloutWorker = RolloutWorker(env, self.agents, args)
-        if not args.evaluate and args.alg.find('coma') == -1 and args.alg.find('central_v') == -1 and args.alg.find('reinforce') == -1:  # these 3 algorithms are on-poliy
-            self.buffer = ReplayBuffer(args)
+        self.agents = Agents(args)
+        self.rolloutWorker = RolloutWorker(env, self.agents, args)
+        self.buffer = ReplayBuffer(args)
         self.args = args
         self.win_rates = []
         self.episode_rewards = []
-
-        # 用来保存plt和pkl
         self.save_path = self.args.result_dir + '/' + args.alg + '/' + args.map
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
@@ -33,19 +26,15 @@ class Runner:
             print('Run {}, time_steps {}'.format(num, time_steps))
             if time_steps // self.args.evaluate_cycle > evaluate_steps:
                 win_rate, episode_reward = self.evaluate()
-                # print('win_rate is ', win_rate)
                 self.win_rates.append(win_rate)
                 self.episode_rewards.append(episode_reward)
                 self.plt(num)
                 evaluate_steps += 1
             episodes = []
-            # 收集self.args.n_episodes个episodes
             for episode_idx in range(self.args.n_episodes):
                 episode, _, _, steps = self.rolloutWorker.generate_episode(episode_idx)
                 episodes.append(episode)
                 time_steps += steps
-                # print(_)
-            # episode的每一项都是一个(1, episode_len, n_agents, 具体维度)四维数组，下面要把所有episode的的obs拼在一起
             episode_batch = episodes[0]
             episodes.pop(0)
             for episode in episodes:
